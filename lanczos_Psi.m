@@ -26,7 +26,7 @@ a(2)=q(:,2)'*trial2(H1,H2,H3,H4,J,q(:,2));
 % Iteration with j>=2
 j=1;b(2)=9;c0 = rand;c1 = 0;
 T1 = zeros(j,j);T1(1,1)=a(1);
-while (abs(c1-c0)>10^(-16))&&(j<D)
+while (abs(c1-c0)>10^(-10))&&(j<D)
     q(:,j+1)=r(:,j)/b(j);
     j = j+1;
     a(j)=q(:,j)'*trial2(H1,H2,H3,H4,J,q(:,j));

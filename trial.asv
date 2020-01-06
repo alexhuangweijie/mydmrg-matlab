@@ -57,7 +57,7 @@ system_block{-2+half_sites,1} = K;
 groundstate = cell(tot_sites+2,1);
 transform_L = cell(tot_sites+2,1);transform_L{2,1}=eye(2);transform_L{1,1}=1;
 transform_R = cell(tot_sites+2,1);transform_R{2,1}=eye(2);transform_R{1,1}=1;
-%有限系统循环
+%无限系统循环
 Block_L = BLOCK;Block_R = BLOCK;
 for i = 1 : niter
     %第i轮循环的时候 此时的Free_site为编号为1+i , niter*2-i-1 的两个格点
@@ -71,72 +71,14 @@ for i = 1 : niter
     %[ Psi , Energy ] = eigs ( H_super , 1 , 'SR' );
     EnergyPerBond = ( Energy - LastEnergy ) / 2;
     %此函数是进行基变换，将左右两个块的哈密顿量和算符进行变换  输入的是基态 函数里面含有求密度矩阵和约化密度矩阵的操作
-    [ Block_L , Block_R ] = Rotate_hubbard( Block_L , Block_R , Psi  , noftk );
+    %[ Block_L , Block_R ] = Rotate_hubbard( Block_L , Block_R , Psi  , noftk );
+    [ Block_L,Block_R,transform1,transform2] = Rotate_hubbard_transformation( Block_L,Block_R,Psi,noftk);
+    %存储变换矩阵
+    transform_L{i+2} = transform1;
+    transform_R{i+2} = transform2;
     system_block{ i+2 , 1 } = Block_L;
     environment_block{ i+2 , 1 } = Block_R;
 end
-
-%有限部分热身
-Energy2 = Energy;
-sites_in_environment = tot_sites - sites_in_system - 2;
-counter = 0;Mark2=[];
-for sweep = 1 : 1
-    for iw = 1 : 3%ii指标反映对应的扫的时候的移动方向 奇数向右 偶数向左
-        change = [ 1 , -1 , 1  ];
-        while sites_in_system ~= -1 && sites_in_environment ~= -1
-            Block_L = system_block{ sites_in_system + 1 , 1 };
-            Block_R = environment_block{sites_in_environment + 1 , 1 };
-            Free_site_L = system_block{ sites_in_system + 2 , 2 };
-            Free_site_R = system_block{ sites_in_system + 3 , 2 };
-            %对角化superblock哈密顿量 求基态
-            LastEnergy2 = Energy2;
-            [Psi,Energy] = lanczos2(Block_L , Free_site_L , Free_site_R , Block_R ,j );
-            %构造哈密顿量
-            [ H_super , Block_L , Block_R ] = BlockBuilding_hubbard ( Block_L , Free_site_L , Free_site_R , Block_R , j ,Bz );
-            %[ Psi , Energy2 ] = eigs( H_super , 1 , 'SR' );
-            %储存基态
-            groundstate{sites_in_system+1} = Psi;
-            convergence = ( Energy2 - LastEnergy2 ) / 2;
-            EnergyPerBond2 = Energy2 / ( tot_sites - 1 );
-            %测量
-            [ measure_temp1 , measure_temp2 ] = Measure_hubbard ( Block_L , Free_site_L , Free_site_R , Block_R , Psi );
-            %求密度矩阵 约化密度矩阵 求变换矩阵 返回变换矩阵
-            transform_input1 = transform_L{sites_in_system+1};
-            transform_input2 = transform_R{sites_in_environment+1};
-            [ Block_L,Block_R,transform1,transform2] = Rotate_hubbard_transformation( Block_L,Block_R,Psi,noftk);
-            %存储变换矩阵
-            if mod(iw,2)==1
-                transform_L{sites_in_system+2} = transform1;
-            else
-                transform_R{sites_in_environment+2} = transform2;
-            end
-            %在每个sweep中 选择ii等于2的时候进行的测量结果储存
-            if  iw == 1|| iw == 3
-                system_block{ sites_in_system + 2 , 1 } = Block_L;
-            elseif iw == 2
-                environment_block{ sites_in_environment + 2 , 1 } = Block_R;
-                measure1(sites_in_system+2, sweep) = measure_temp1;
-            end
-            %记录每个块里面的格点数变化  ii奇数change为1 对应于左边system扩大 右边environment缩小
-            sites_in_environment = sites_in_environment - change(iw);
-            sites_in_system = sites_in_system + change(iw);
-            Mark2=[Mark2; sites_in_system,sites_in_environment,sweep,iw];
-            counter = counter + 1 ;
-            if iw == 3 && sites_in_system == half_sites-1
-                Mark2=[Mark2;0,0,0,0];
-                break
-            end
-        end
-        if iw==1
-            sites_in_environment = 1;
-            sites_in_system = tot_sites-3;
-        elseif iw==2
-            sites_in_system = 1;
-            sites_in_environment = tot_sites-3;
-        end
-    end
-end
-
 %有限部分循环 使用上一轮的波函数加速
 Energy2 = Energy;
 sites_in_environment = tot_sites - sites_in_system - 2;
@@ -145,7 +87,16 @@ Psi_lanczos = rand(noftk^2*4,1);
 for sweep = 1 : 10
     for ii = 1 : 3%ii指标反映对应的扫的时候的移动方向 奇数向右 偶数向左
         change = [ 1 , -1 , 1  ];
-        while sites_in_system ~=  && sites_in_environment ~= -1
+        while counter<10000
+            if (sites_in_system==0&&ii==2)||(sites_in_environment==0&&ii==1)||(sites_in_environment==0&&ii==3)
+                Mark2=[Mark2;0,0,0,3,ii];
+                break
+            end
+            %结束一次sweep
+            if ii == 3 && sites_in_system == 30
+                Mark2=[Mark2;0,0,0,2,ii];
+                break
+            end
             Block_L = system_block{ sites_in_system + 1 , 1 };
             Block_R = environment_block{sites_in_environment + 1 , 1 };
             Free_site_L = system_block{ sites_in_system + 2 , 2 };
@@ -187,19 +138,12 @@ for sweep = 1 : 10
             %记录每个块里面的格点数变化  ii奇数change为1 对应于左边system扩大 右边environment缩小
             sites_in_environment = sites_in_environment - change(ii);
             sites_in_system = sites_in_system + change(ii);
-            Mark2=[Mark2; sites_in_system,sites_in_environment,sweep,ii];
+            Mark2=[Mark2; sites_in_system,sites_in_environment,sweep,1,ii];
             counter = counter + 1 ;
             if ii == 3 && sites_in_system == half_sites-1
-                Mark2=[Mark2;0,0,0,0];
+                Mark2=[Mark2;0,0,0,0,0];
                 break
             end
-        end
-        if ii==1
-            sites_in_environment = 1;
-            sites_in_system = tot_sites-3;
-        elseif ii==2
-            sites_in_system = 1;
-            sites_in_environment = tot_sites-3;
         end
     end
 end
