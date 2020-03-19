@@ -4,13 +4,13 @@ clear
 clc
 format long
 %参数初始化%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-noftk=100;%留下的向量的最大数目
+noftk=60;%留下的向量的最大数目
 niter=29;%链的长度
 Bz=0;%磁场
 j.t=1;
 j.delta=1;
-j.mu=1.5;
-j.u=1.6;
+j.mu=0;
+j.u=0;
 deltaT = 0.1;%时间演化的步长
 steps =50 ;%时间演化的步数
 
@@ -56,7 +56,6 @@ system_block{ 1 , 1 } = EMPTY;environment_block{ 1 , 1 } = EMPTY;
 system_block{ end , 1 } = EMPTY;environment_block{ end , 1 } = EMPTY;
 %无限系统循环%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Psi = 0;
-mEnergy = [];
 Block_L = BLOCK;Block_R = BLOCK;
 for i = 1 : niter
     %第i轮循环的时候 此时的Free_site为编号为1+i , niter*2-i-1 的两个格点
@@ -65,12 +64,12 @@ for i = 1 : niter
     %函数是将左右块和两个自由格点当作输入参数，返回的是系统哈密顿量和两个并入自由格点的块
     [ Block_L , Block_R ] = BlockBuilding_hubbard ( Block_L , Free_site_L , Free_site_R , Block_R , j  , Bz );
     %对角化哈密顿量
-    %LastEnergy = Energy;
+    LastEnergy = Energy;
     [HL1,HL4,HR1,HR4] = nonhermitian(Block_L ,Block_R);
-    [PsiL,EnergyL] = lanczos(HL1 ,HL4 , j );
-    [PsiR,EnergyR] = lanczos(HR1 ,HR4 , j );
-    mEnergy = [mEnergy;EnergyL, EnergyR];
-    %EnergyPerBond = ( Energy - LastEnergy ) / 2;
+    [PsiL,Energy] = lanczos(HL1 ,HL4 , j );
+    [PsiR,Energy] = lanczos(HR1 ,HR4 , j );
+    %[ Psi , Energy ] = eigs ( H_super , 1 , 'SR' );
+    EnergyPerBond = ( Energy - LastEnergy ) / 2;
     %此函数是进行基变换，将左右两个块的哈密顿量和算符进行变换  输入的是基态 函数里面含有求密度矩阵和约化密度矩阵的操作
     [ Block_L , Block_R,~,~ ] = Rotate_operator( Block_L , Block_R , PsiL , PsiR  , noftk );
     system_block{ i+2 , 1 } = Block_L;
@@ -83,9 +82,8 @@ end
 Energy2 = Energy;
 sites_in_environment = tot_sites - sites_in_system - 2;
 counter = 0;Mark2=[];sweep = 1;
-mEnergy = [mEnergy;33,33];
 %for sweep = 1 : 10
-while (sweep <10)||((sum(abs(PsiEnergy(:,1)-PsiEnergy(:,2)))>10^(-6))&&(sweep<30))
+while (sweep <100)||((sum(abs(PsiEnergy(:,1)-PsiEnergy(:,2)))>10^(-6))&&(sweep<30))
     for ii = 1 : 3%ii指标反映对应的扫的时候的移动方向 奇数向右 偶数向左
         change = [ 1 , -1 , 1  ];
         while counter<1000000
@@ -110,12 +108,18 @@ while (sweep <10)||((sum(abs(PsiEnergy(:,1)-PsiEnergy(:,2)))>10^(-6))&&(sweep<30
             [HL1,HL4,HR1,HR4] = nonhermitian(Block_L ,Block_R);
             [PsiL,Energy] = lanczos(HL1 ,HL4 , j );
             [PsiR,Energy] = lanczos(HR1 ,HR4 , j );
+            [Psi,Energy] = lanczos(Block_L ,Block_R , j, Psi );
+            %[ Psi , Energy2 ] = eigs( H_super , 1 , 'SR' );
             %储存基态 储存能量
-            mEnergy = [mEnergy;EnergyL, EnergyR];
+            groundstate{sites_in_system+1} = Psi;
+            PsiEnergy(mod(counter,niter*4)+1,2) = PsiEnergy(mod(counter,niter*4)+1,1);
+            PsiEnergy(mod(counter,niter*4)+1,1) = Energy;
+            convergence = ( Energy2 - LastEnergy2 ) / 2;
+            EnergyPerBond2 = Energy2 / ( tot_sites - 1 );
             %测量
-            [ measure_temp1 , measure_temp2 ] = Measure ( Block_L , Free_site_L , Free_site_R , Block_R , PsiL , PsiR );
+            [ measure_temp1 , measure_temp2 ] = Measure ( Block_L , Free_site_L , Free_site_R , Block_R , Psi );
             %求密度矩阵 约化密度矩阵 求变换矩阵 返回变换矩阵
-            [ Block_L , Block_R , transform1 , transform2] = Rotate_operator( Block_L , Block_R , PsiL , PsiR  , noftk );
+            [ Block_L , Block_R , transform1 , transform2] = Rotate_operator( Block_L , Block_R , Psi  , noftk );
             %存储变换矩阵
             if mod(ii,2)==1
                 transform_L{sites_in_system+2} = transform1;
@@ -127,8 +131,7 @@ while (sweep <10)||((sum(abs(PsiEnergy(:,1)-PsiEnergy(:,2)))>10^(-6))&&(sweep<30
                 system_block{ sites_in_system + 2 , 1 } = Block_L;
             elseif ii == 2
                 environment_block{ sites_in_environment + 2 , 1 } = Block_R;
-                measure1(sites_in_system+1, sweep) = abs(measure_temp1);
-                measure2(sites_in_system+2, sweep) = measure_temp2;
+                measure1(sites_in_system+2, sweep) = abs(measure_temp1);
             end
             %记录每个块里面的格点数变化  ii奇数change为1 对应于左边system扩大 右边environment缩小
             sites_in_environment = sites_in_environment - change(ii);
@@ -136,13 +139,96 @@ while (sweep <10)||((sum(abs(PsiEnergy(:,1)-PsiEnergy(:,2)))>10^(-6))&&(sweep<30
             Mark2=[Mark2; sites_in_system,sites_in_environment,sweep,1,ii];
             counter = counter + 1 ;
         end
+        %         if ii==1
+        %             sites_in_environment = 1;
+        %             sites_in_system = tot_sites-3;
+        %         elseif ii==2
+        %             sites_in_system = 1;
+        %             sites_in_environment = tot_sites-3;
+        %         end
     end
     sweep = sweep + 1;PsiEnergy;
 end
+
+%时间演化部分%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Energy3 = Energy;
+% %选择从左边块里面没有格点为时间演化的开始
+% sites_in_system = 0  ;
+% sites_in_environment = tot_sites - sites_in_system - 2;
+% counter2 = 0;Mark1=[];
+% %读取初始的态 和自由格点的算符
+% Free_site_L = system_block{ 8 , 2 };
+% Free_site_R = system_block{ 8 , 2 };
+% Psi = groundstate{sites_in_system+1};
+% for sweep2 = 1 : steps
+%     %iii表示扫的时候移动的方向
+%     for iii = 1 : 4
+%         change = [ 1 , -1 , 1 , -1 , 1 ];
+%         while counter2<3000
+%             %在扫到缩小的块里面没有格点的时候就换方向
+%             if (sites_in_system==0&&iii==2)||(sites_in_environment==0&&iii==1)||(sites_in_environment==0&&iii==3)
+%                 Mark1=[Mark1;0,0,0,0,3,iii];
+%                 break
+%             end
+%             %结束一次sweep
+%             if iii == 4 && sites_in_system == 0
+%                 Mark1=[Mark1;0,0,0,0,2,iii];
+%                 break
+%             end
+%             Block_L = system_block{ sites_in_system + 1 , 1 };
+%             Block_R = environment_block{sites_in_environment + 1 , 1 };
+%             %计算时间演化算符 iii==1和2进行时间演化  iii=3的时候进行测量
+%             %iii=4不操作（为了使得每个sweep的起点相同）
+%             if iii==1||iii==2
+%                 Psi = Uoperator_hubbard( Block_L , Free_site_L , Free_site_R , Block_R , j , deltaT ,Psi);
+%             else
+%                 U = 1;
+%             end
+%             %Psi = U * Psi;
+%             %测量
+%             if iii == 3
+%                 [ measure_temp1 , measure_temp2 ] = Measure ( Block_L , Free_site_L , Free_site_R , Block_R , Psi );
+%                 measure2(sites_in_system+2, sweep2) = measure_temp1;
+%             end
+%             %读取变换矩阵
+%             transform_input1 = transform_L{sites_in_system+1};
+%             transform_input2 = transform_R{sites_in_environment+1};
+%             %输入演化之后的态 进行矩阵变换 变换矩阵
+%             %Psi_L Psi_R左边扩大和右扩大的情况的态
+%             [ Psi_L , Psi_R ,transform1 , transform2 ] = Rotate_state( Block_L , Block_R , Psi  , noftk ,transform_input1 ,transform_input2 );
+%             %将扩大的块的变换矩阵进行储存
+%             if iii==1||iii==2
+%                 if mod(iii,2)==1
+%                     transform_L{sites_in_system+2} = transform1;
+%                 else
+%                     transform_R{sites_in_environment+2} = transform2;
+%                 end
+%             end
+%             %更新态Psi
+%             if  iii == 1||iii==3
+%                 Psi = Psi_L;
+%             elseif iii == 2||iii==4
+%                 Psi= Psi_R;
+%             end
+%             sites_in_environment = sites_in_environment - change(iii);
+%             sites_in_system = sites_in_system + change(iii);
+%             counter2 = counter2 + 1;
+%             Mark1=[Mark1; sites_in_system,sites_in_environment,size(Psi),1,iii];
+%         end
+%     end
+% end
+
+
+
+%fprintf('%.8f\t%.8f\t%.8f\n%.8f\t%.8f\t%.8f\n%.8f\n', Energy, EnergyPerBond,ExactEnergy-EnergyPerBond,Energy2,EnergyPerBond2,ExactEnergy-EnergyPerBond2 ,convergence);
 figure(1)
-plot(measure1(3:end,9));
-figure(2)
-plot(measure2(3:end,9));
-
-
-
+plot(measure1(3:end,33));
+%hold on
+%plot(measure2(2:end,1:end))
+%figure(2)
+%plot(PsiEnergy(:,1)-PsiEnergy(:,2))
+%figure(2)
+% for index = 1:13
+%     figure(index)
+% plot(measure2(2:end,index));
+% end

@@ -1,4 +1,4 @@
-function [V,c1]=lanczos(H1 ,H4 ,J ,Psi)
+function [V,c1]=lanczos(H1 ,H4 ,J)
 
 %clear
 % tic
@@ -8,11 +8,14 @@ function [V,c1]=lanczos(H1 ,H4 ,J ,Psi)
 D = H1.basis_size*H4.basis_size;
 %D = d(1);
 %Iteration with j=0
-if length(Psi) == D
-    r0 = Psi;
-else
+%if length(Psi) ==
+%D%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%此处不用Psi初始r0作为输入
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %r0 = Psi;
+%else
     r0 = rand(D,1);
-end
+%end
 b0=sqrt(r0'*r0);
 q(:,1)=r0/b0;
 %a(1)=q(:,1)'*A*q(:,1);

@@ -1,10 +1,10 @@
-function [ Block1 , Block2 , T1 , T2 ] = Rotate_operator ( A , B , Psi , noftk   )
+function [ Block1 , Block2 , T1 , T2 ] = Rotate_operator ( A , B , PsiL ,PsiR , noftk   )
 Block1 = A;
 Block2 = B;
 a1 = Block1.basis_size;
 b1 = Block2.basis_size;
 %左边的BLOCK的处理
-Psimatrix = reshape ( Psi , b1 , a1 );
+Psimatrix = reshape ( PsiL , b1 , a1 );
 RDM = Psimatrix' * Psimatrix;
 %对角化约化密度矩阵 处理左边的块
 [ vector1 ,eigenvalues ] = eig ( RDM );
@@ -19,7 +19,7 @@ Block1.Cdag = T1' * Block1.Cdag * T1;
 Block1.N = T1' * Block1.N * T1;
 Block1.I = T1' * Block1.I * T1;
 %右边的BLOCK的处理
-Psimatrix = reshape ( Psi , b1 , a1 );
+Psimatrix = reshape ( PsiR , b1 , a1 );
 RDM = Psimatrix * Psimatrix';
 [ vector2 , eigenvalues ] = eig( RDM );
 [ ~ , index ] = sort( diag ( eigenvalues ) , 'descend' );
