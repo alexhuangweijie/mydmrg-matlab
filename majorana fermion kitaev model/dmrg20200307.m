@@ -4,19 +4,21 @@ clear
 clc
 format long
 %参数初始化%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-noftk=100;%留下的向量的最大数目
+noftk=30;%留下的向量的最大数目
 niter=29;%链的长度
 Bz=0;%磁场
-j.t=1;
-j.delta=1;
-j.mu=1.5;
-j.u=1.6;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%参数设置 没有U就不用考虑复数的问题
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+j.t=10;
+j.delta=10;
+j.mu=0;
+j.u=0;
 deltaT = 0.1;%时间演化的步长
 steps =50 ;%时间演化的步数
-
 %程序变量声明及初始化%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-measure1 = zeros(niter*2, 10);%测量结果储存
-measure2 = zeros(niter*2, steps);
+measure1 = zeros(niter*2, 50);%测量结果储存
+measure2 = zeros(niter*2, 50);
 PsiEnergy = zeros(4*niter,2);%测量结果储存
 %measure3 = zeros(niter*2, 10);
 %block从2个site开始 循环一次系统加一个site superblock一共2*Niter+2个site
@@ -55,7 +57,7 @@ end
 system_block{ 1 , 1 } = EMPTY;environment_block{ 1 , 1 } = EMPTY;
 system_block{ end , 1 } = EMPTY;environment_block{ end , 1 } = EMPTY;
 %无限系统循环%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Psi = 0;
+Psi = 0;PsiL = 0; PsiR = 0;
 mEnergy = [];
 Block_L = BLOCK;Block_R = BLOCK;
 for i = 1 : niter
@@ -67,17 +69,14 @@ for i = 1 : niter
     %对角化哈密顿量
     %LastEnergy = Energy;
     [HL1,HL4,HR1,HR4] = nonhermitian(Block_L ,Block_R);
-    [PsiL,EnergyL] = lanczos(HL1 ,HL4 , j );
-    [PsiR,EnergyR] = lanczos(HR1 ,HR4 , j );
+    [PsiL,EnergyL] = lanczos(HL1 ,HL4 , j ,PsiL);
+    [PsiR,EnergyR] = lanczos(HR1 ,HR4 , j ,PsiR);
     mEnergy = [mEnergy;EnergyL, EnergyR];
-    %EnergyPerBond = ( Energy - LastEnergy ) / 2;
     %此函数是进行基变换，将左右两个块的哈密顿量和算符进行变换  输入的是基态 函数里面含有求密度矩阵和约化密度矩阵的操作
     [ Block_L , Block_R,~,~ ] = Rotate_operator( Block_L , Block_R , PsiL , PsiR  , noftk );
     system_block{ i+2 , 1 } = Block_L;
     environment_block{ i+2 , 1 } = Block_R;
 end
-
-
 %有限部分循环
 %作为热身%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Energy2 = Energy;
@@ -85,7 +84,7 @@ sites_in_environment = tot_sites - sites_in_system - 2;
 counter = 0;Mark2=[];sweep = 1;
 mEnergy = [mEnergy;33,33];
 %for sweep = 1 : 10
-while (sweep <10)||((sum(abs(PsiEnergy(:,1)-PsiEnergy(:,2)))>10^(-6))&&(sweep<30))
+while (sweep <50)||((sum(abs(PsiEnergy(:,1)-PsiEnergy(:,2)))>10^(-6))&&(sweep<50))
     for ii = 1 : 3%ii指标反映对应的扫的时候的移动方向 奇数向右 偶数向左
         change = [ 1 , -1 , 1  ];
         while counter<1000000
@@ -108,21 +107,16 @@ while (sweep <10)||((sum(abs(PsiEnergy(:,1)-PsiEnergy(:,2)))>10^(-6))&&(sweep<30
             %对角化superblock哈密顿量 求基态
             LastEnergy2 = Energy2;
             [HL1,HL4,HR1,HR4] = nonhermitian(Block_L ,Block_R);
-            [PsiL,Energy] = lanczos(HL1 ,HL4 , j );
-            [PsiR,Energy] = lanczos(HR1 ,HR4 , j );
+            [PsiL,EnergyL] = lanczos(HL1 ,HL4 , j , PsiL);
+            [PsiR,EnergyR] = lanczos(HR1 ,HR4 , j , PsiR);
             %储存基态 储存能量
             mEnergy = [mEnergy;EnergyL, EnergyR];
+            PsiEnergy(mod(counter,niter*4)+1,2) = PsiEnergy(mod(counter,niter*4)+1,1); 
+            PsiEnergy(mod(counter,niter*4)+1,1) = Energy; 
             %测量
             [ measure_temp1 , measure_temp2 ] = Measure ( Block_L , Free_site_L , Free_site_R , Block_R , PsiL , PsiR );
             %求密度矩阵 约化密度矩阵 求变换矩阵 返回变换矩阵
             [ Block_L , Block_R , transform1 , transform2] = Rotate_operator( Block_L , Block_R , PsiL , PsiR  , noftk );
-            %存储变换矩阵
-            if mod(ii,2)==1
-                transform_L{sites_in_system+2} = transform1;
-            else
-                transform_R{sites_in_environment+2} = transform2;
-            end
-            %在每个sweep中 选择ii等于2的时候进行的测量结果储存
             if  ii == 1|| ii == 3
                 system_block{ sites_in_system + 2 , 1 } = Block_L;
             elseif ii == 2

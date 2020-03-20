@@ -5,7 +5,9 @@ a1 = Block1.basis_size;
 b1 = Block2.basis_size;
 %左边的BLOCK的处理
 Psimatrix = reshape ( PsiL , b1 , a1 );
-RDM = Psimatrix' * Psimatrix;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+RDM = Psimatrix' * Psimatrix;%如果有虚数需要注意这个地方
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %对角化约化密度矩阵 处理左边的块
 [ vector1 ,eigenvalues ] = eig ( RDM );
 [ ~ , index ] = sort ( diag ( eigenvalues ) ,'descend' );
@@ -20,7 +22,9 @@ Block1.N = T1' * Block1.N * T1;
 Block1.I = T1' * Block1.I * T1;
 %右边的BLOCK的处理
 Psimatrix = reshape ( PsiR , b1 , a1 );
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 RDM = Psimatrix * Psimatrix';
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 [ vector2 , eigenvalues ] = eig( RDM );
 [ ~ , index ] = sort( diag ( eigenvalues ) , 'descend' );
 vector2 = vector2( : , index );

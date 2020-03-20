@@ -10,8 +10,8 @@ end
     m1 =  PsiL' * mykron(kron( I1,H2.N), kron( H3.I,I2), PsiR);
     %m2 =  Psi' * kron( kron( I1,kron(H2.I, H3.N)), I2) * Psi;
     m2 =  PsiL' * mykron( kron( I1,H2.I), kron(H3.N,I2), PsiR);
-    m1 = (m1*1i+1)*0.5;
-    m2 = (m2*1i+1)*0.5;    
+    %m1 = (m1*1i+1)*0.5;
+    %m2 = (m2*1i+1)*0.5;    
 end
 
     function [e] = mykron(a,b,p)
