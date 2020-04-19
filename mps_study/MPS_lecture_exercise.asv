@@ -1,0 +1,23 @@
+clear 
+Da = 10;
+Db = 10;
+Dg = 10;
+Dm = 10;
+Dd = 10;
+A = rand(Dg, Dd);
+B = rand(Da, Dg, Dm);
+C = rand(Dd, Dm, Db);
+AC = ncon({A,B,C},{[1,2],[-1,1,3],[2,3,-2]});
+
+% bond dimensions
+Da = 70; % alpha
+Db = 71; % beta
+Dc = 72; % gamma
+Dd = 73; % delta
+Dm = 74; % mu
+A = rand(Dc,Dd); % tensor A(gamma,delta)
+B = rand(Da,Dm,Dc); % tensor B(alpha,mu,gamma)
+C = rand(Db,Dm,Dd); % tensor C(beta,mu,delta)
+BC = contract(B,3,2,C,3,2,'-v'); % BC(alpha,gamma,beta,delta)
+ABC1 = contract(BC,4,[2 4],A,2,[1 2],'-v'); % ABC(alpha,beta)
+
