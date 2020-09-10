@@ -1,0 +1,264 @@
+clear
+%system parameter
+format long
+t = 1;
+%perturbation
+tt = t-0.0001;
+delta = t;
+U = 1 * t;
+mu = 0.5 * t;
+N = 100; % number of sites in a chain
+%DMRG parameter
+Nkeep = 30; % bond dimension
+Nsweep = 2; % number of pairs of left+right sweeps
+% OPTS.maxit = 2; % iterations of Lanczos method
+% OPTS.krydim = 4; % dimension of Krylov subspace
+%Local operators
+Z = [-1,0;0,1];%Z
+D = [0,1;1,0];%Sx
+Sz = [1,0;0,-1];%Sz
+Sx = 0.5*[0,1;1,0];%Sx
+Sy = 0.5*[0,1;-1,0];% i*Sy
+%MPO formulation of Hamiltonian
+%Hamiltonian tensor for each chain site
+Hloc = zeros(4,4,2,2);
+Hloc(1,1,:,:) = eye(2);
+Hloc(2,1,:,:) = D;
+Hloc(3,1,:,:) = Sz;
+Hloc(4,1,:,:) = mu/2 * Sz;
+Hloc(4,2,:,:) = -4*t * D;
+Hloc(4,3,:,:) = 4*U * Sz;
+Hloc(4,4,:,:) = eye(2);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Hloc = permute(Hloc,[1 3 2 4]); % leg order: left-bottom-right-top%%%%(DONT CHANGE THIS)%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Hs = cell(1,N);
+Hs(1:N) = {Hloc};
+Hs{1} = Hs{1}(end,:,:,:);% choose the last components of the left leg
+Hs{end} = Hs{end}(:,:,1,:);% choose the first components of the right leg
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Hloc1 = zeros(4,4,2,2);
+Hloc1(1,1,:,:) = eye(2);
+Hloc1(2,1,:,:) = Sx;
+Hloc1(3,1,:,:) = Sz;
+Hloc1(4,1,:,:) = mu * Sz;
+Hloc1(4,2,:,:) = -4* tt * Sx;
+Hloc1(4,3,:,:) = -4*U * Sz;
+Hloc1(4,4,:,:) = eye(2);
+Hloc1 = permute(Hloc1,[1 3 2 4]);
+Hs(2:2:N) = {Hloc1};
+Hs{end} = Hloc1(:,:,1,:);%rotation_bond
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+[A0,E0,Eiter0] = DMRG_2site (Hs,Nkeep,Nsweep);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%calculate the G(I,I+1) G(I+2,I+3) G(1,L) with different phase
+% 
+A = A0;
+phase = zeros(360,3); 
+for itp = 1 : 360
+%     itp = 180;%set 90 degree
+    % % rotation
+    U_1_rotation_bond = zeros(2,2,2,2);
+    %rotation angle of the U(1) rotation
+    U_1_rotation_bond(1,1,1,1) = 1;
+    U_1_rotation_bond(1,2,1,2) = exp(2*pi/360*itp*1i);
+    U_1_rotation_bond(2,1,2,1) = exp(2*pi/360*itp*1i);
+%     U_1_rotation_bond(1,2,2,1) = exp(2*pi/360*itp*1i);
+%     U_1_rotation_bond(2,1,1,2) = exp(2*pi/360*itp*1i);
+    U_1_rotation_bond(2,2,2,2) = 1;
+    U_1_rotation_bond = permute(U_1_rotation_bond,[1,4,3,2]);
+    U_1 = U_1_rotation_bond;
+    phase(itp, 1) = rotate_measurement(A, N, U_1, 1, N);
+    phase(itp, 2) = rotate_measurement(A, N, U_1, 30, 31);
+    phase(itp, 3) = rotate_measurement(A, N, U_1, 31, 32);
+end
+figure(1)
+plot(real(phase))
+lgd = legend('G_{1L}', 'G_{30,31}','G_{31,32}');
+lgd.FontSize = 12;
+lgd.FontWeight = 'bold';
+xlabe('phase');
+yl
+
+G = zeros(N,N);
+%     itp = 180;%set 90 degree
+% % rotation
+U_1_rotation_bond = zeros(2,2,2,2);
+%rotation angle of the U(1) rotation
+U_1_rotation_bond(1,1,1,1) = 1;
+U_1_rotation_bond(1,2,1,2) = exp(2*pi/360*90*1i);
+U_1_rotation_bond(2,1,2,1) = exp(2*pi/360*90*1i);
+U_1_rotation_bond(2,2,2,2) = 1;
+U_1_rotation_bond = permute(U_1_rotation_bond,[1,4,3,2]);
+U_1 = U_1_rotation_bond;
+for  index_1 = 1:N-1
+    for index_2 = index_1+1:N
+        G(index_1,index_2) = rotate_measurement(A, N, U_1, index_1, index_2);
+    end
+end
+figure(2)
+[X, Y] = meshgrid(1:N, 1:N);
+meshz(X, Y, abs(G))
+zlabel('$|G_{ij}|$','Interpreter','latex','fontsize',20);
+xlabel('j');
+ylabel('i');
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% aa = [];c = [];
+% % for ii = 1:11
+% U = 0.5;
+% mu = 0.5;
+% t = 1;
+% I = eye(2);
+% Sx = 0.5*[0,1;1,0];
+% Sz = 0.5*[1,0;0,-1];
+% Sy = 0.5*[0,1;-1,0];
+% Z = [-1,0;0,1];
+% %finding ground state
+% H = mu * ( kron(Sz,eye(32)) + kron(kron(eye(2),Sz),eye(16)) + kron(kron(eye(4),Sz),eye(8)) + kron(kron(eye(8),Sz),eye(4)) + kron(kron(eye(16),Sz),eye(2)) + kron(eye(32),Sz) )...
+%  + 4*U * ( kron(kron(Sz,Sz),eye(16)) + kron(kron(kron(eye(2),Sz),Sz),eye(8)) + kron(kron(kron(eye(4),Sz),Sz),eye(4)) + kron(kron(kron(eye(8),Sz),Sz),eye(2)) + kron(kron(eye(16),Sz),Sz) )...
+%  - 4*t * ( kron(kron(Sx,Sx),eye(16)) + kron(kron(kron(eye(2),Sx),Sx),eye(8)) + kron(kron(kron(eye(4),Sx),Sx),eye(4)) + kron(kron(kron(eye(8),Sx),Sx),eye(2)) + kron(kron(eye(16),Sx),Sx) );
+% [a, b] = eigs(H,1,'sr');
+% c = [];
+% for i = 1:64
+%     if abs(a(i))>0.001
+%         c = [c;i];
+%     end
+% end
+% res = dec2bin(64-c);
+% aa = dec2bin(64-linspace(1,64,64));
+% %adding phase and calculate Gij
+% U_1_angle = [
+%     0
+%     1
+%     2
+%     1
+%     2
+%     3
+%     2
+%     1
+%     2
+%     3
+%     4
+%     3
+%     2
+%     3
+%     2
+%     1
+%     2
+%     3
+%     4
+%     3
+%     4
+%     5
+%     4
+%     3
+%     2
+%     3
+%     4
+%     3
+%     2
+%     3
+%     2
+%     1
+%     1
+%     2
+%     3
+%     2
+%     3
+%     4
+%     3
+%     2
+%     3
+%     4
+%     5
+%     4
+%     3
+%     4
+%     3
+%     2
+%     1
+%     2
+%     3
+%     2
+%     3
+%     4
+%     3
+%     2
+%     1
+%     2
+%     3
+%     2
+%     1
+%     2
+%     1
+%     0
+%     ];
+% 
+% index = c;phase = zeros(360,3);
+% for angle = 1:360
+% U_1 = eye(64,64);
+% for i = 1:64
+% U_1(i,i) = exp(-1i/360*pi*angle*10*U_1_angle(i));
+% end
+% MPO = cell(6,6);
+% MPO{1,2} = kron(kron(Sx*2*Z,Sy*2),eye(16));
+% MPO{1,3} = kron(kron(kron(Sx*2*Z,Z),Sy*2),eye(8));
+% MPO{1,4} = kron(kron(kron(kron(Sx*2*Z,Z),Z),Sy*2),eye(4));
+% MPO{1,5} = kron(kron(kron(kron(kron(Sx*2*Z,Z),Z),Z),Sy*2),eye(2));
+% MPO{1,6} = kron(kron(kron(kron(kron(Sx*2*Z,Z),Z),Z),Z),Sy*2);
+% MPO{2,3} = kron(kron(kron(eye(2),Sx*2*Z),Sy*2),eye(8));
+% MPO{2,4} = kron(kron(kron(kron(eye(2),Sx*2*Z),Z),Sy*2),eye(4));
+% MPO{2,5} = kron(kron(kron(kron(kron(eye(2),Sx*2*Z),Z),Z),Sy*2),eye(2));
+% MPO{2,6} = kron(kron(kron(kron(kron(eye(2),Sx*2*Z),Z),Z),Z),Sy*2);
+% MPO{3,4} = kron(kron(kron(eye(4),Sx*2*Z),Sy*2),eye(4));
+% MPO{3,5} = kron(kron(kron(kron(eye(4),Sx*2*Z),Z),Sy*2),eye(2));
+% MPO{3,6} = kron(kron(kron(kron(eye(4),Sx*2*Z),Z),Z),Sy*2);
+% MPO{4,5} = kron(kron(kron(eye(8),Sx*2*Z),Sy*2),eye(2));
+% MPO{4,6} = kron(kron(kron(eye(8),Sx*2*Z),Z),Sy*2);
+% MPO{5,6} = kron(kron(eye(16),Sx*2*Z),Sy*2);
+% MPO{1,1} = kron(Sz*2,eye(32));
+% MPO{2,2} = kron(kron(eye(2),Sz*2),eye(16));
+% MPO{3,3} = kron(kron(eye(4),Sz*2),eye(8));
+% MPO{4,4} = kron(kron(eye(8),Sz*2),eye(4));
+% MPO{5,5} = kron(kron(eye(16),Sz*2),eye(2));
+% MPO{6,6} = kron(eye(32),Sz*2);
+% 
+% G = zeros(6,6);GG = zeros(6,6);
+% for index_i = 1:6
+%     for index_j = index_i:6
+%         if MPO{index_i,index_j} == 0
+%             MPO{index_i,index_j} = eye(64,64);
+%         end
+%         G(index_i, index_j) = a'*U_1'*MPO{index_i,index_j}*U_1*a;
+%         GG = abs(G);
+%     end
+% end
+% 
+% 
+% GG = abs(G);
+% phase(angle,1) = G(1,6);
+% phase(angle,2) = G(1,2);
+% phase(angle,3) = G(2,3);
+% end
+% plot(real(phase))
+% % [X, Y] = meshgrid(1:6, 1:6);
+% % meshz(X, Y, GG)
+% % zlabel('$|G_{ij}|$','Interpreter','latex','fontsize',20);
+% % xlabel('j');
+% % ylabel('i');
+% 
+% 
+% 
+
+%aa(:,ii) = a;
+% % for i = 1:16
+%     if abs(a(1)) > 0.0001
+%         c(ii) = 1;
+%     else
+%         c(ii) = 1;
+%     end
+% % end
+% c
+% end
